@@ -9,14 +9,6 @@
 두 서비스를 조합해서 씁니다. 지도를 그리는 건 네이버 SDK가 더 성숙해서 쓰고, 실제 걸을 수 있는
 경로 계산은 카카오가 2026년 7월에 새로 공개한 도보 길찾기 API로 처리합니다.
 
-## ⚠️ 현재 상태: 카카오 도보 API 연동 미완성
-
-`src/lib/walkingRoute.ts`의 `fetchKakaoWalkingPath` 함수가 아직 비어 있어요 (연동 자리만
-만들어둔 상태). 카카오 REST API 키가 설정돼 있어도 이 함수가 아직 실제 API를 호출하지 않기
-때문에, 지금은 항상 "직선 추정 경로"로만 동작해요. Kakao Developers 콘솔의 도보 길찾기 API
-문서(엔드포인트, 요청 파라미터, 응답 형식)를 확인해서 이 함수를 채워 넣어야 진짜 보행로를
-따라가는 경로가 나옵니다.
-
 ## 준비물
 
 - [Node.js](https://nodejs.org) (LTS 버전)
@@ -108,6 +100,6 @@ npx expo start --dev-client
 App.tsx                    화면 전환(입력 화면 ↔ 지도 화면)
 src/screens/HomeScreen.tsx 산책 시간(분) 입력 화면
 src/screens/MapScreen.tsx  현재 위치 기반 왕복 경로 지도 화면 (네이버 지도로 렌더링)
-src/lib/walkingRoute.ts    왕복 경로 계산 로직 — 카카오 도보 API 연동 자리 + 직선 추정 폴백
+src/lib/walkingRoute.ts    왕복 경로 계산 로직 — 카카오 도보 길찾기 API 연동, 실패 시 직선 추정 폴백
 app.config.ts              Expo 설정 + 네이버 지도 SDK / 위치 권한 설정
 ```

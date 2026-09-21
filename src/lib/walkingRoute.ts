@@ -49,22 +49,80 @@ export interface RoundTripRoute {
   isFallback: boolean;
 }
 
-/**
- * 카카오맵 도보 경로 조회 REST API 연동 자리.
- *
- * TODO: 정확한 엔드포인트/요청 파라미터/응답 필드는 Kakao Developers 공식 문서를 보고
- * 채워 넣어야 한다 (이 환경에서는 kakao.com 도메인 접근이 막혀 있어 직접 확인이 불가능했다).
- * 문서를 확인하는 즉시 아래 fetch 호출부만 채우면 된다 — 이 함수의 인터페이스(입력/출력)는
- * 이미 앱 전체와 맞춰서 설계해뒀다.
- */
-async function fetchKakaoWalkingPath(
-  _origin: Coordinate,
-  _destination: Coordinate,
-  _restApiKey: string
-): Promise<Coordinate[]> {
-  throw new Error(
-    '카카오 도보 경로 API 연동이 아직 설정되지 않았습니다 (src/lib/walkingRoute.ts의 fetchKakaoWalkingPath 참고).'
+const KAKAO_WALKING_DIRECTIONS_URL = 'https://dapi.kakao.com/v2/routing/walk';
+
+interface KakaoRoutingResponse {
+  status: string;
+  route?: {
+    properties: {
+      totalDistance: number;
+      totalTime: number;
+    };
+    legs: {
+      steps: {
+        path: {
+          points: [number, number][];
+        };
+      }[];
+    }[];
+  };
+}
+
+interface KakaoWalkingLeg {
+  path: Coordinate[];
+  distanceMeters: number;
+  timeSeconds: number;
+}
+
+async function fetchKakaoWalkingLeg(
+  origin: Coordinate,
+  destination: Coordinate,
+  restApiKey: string
+): Promise<KakaoWalkingLeg> {
+  const params = new URLSearchParams({
+    start_x: String(origin.longitude),
+    start_y: String(origin.latitude),
+    end_x: String(destination.longitude),
+    end_y: String(destination.latitude),
+  });
+
+  const response = await fetch(
+    `${KAKAO_WALKING_DIRECTIONS_URL}?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `KakaoAK ${restApiKey}`,
+      },
+    }
   );
+
+  if (!response.ok) {
+    throw new Error(`카카오 도보 경로 API 요청 실패: HTTP ${response.status}`);
+  }
+
+  const data: KakaoRoutingResponse = await response.json();
+
+  if (data.status !== 'OK' || !data.route) {
+    throw new Error(`카카오 도보 경로 API 응답 오류: ${data.status}`);
+  }
+
+  const path: Coordinate[] = data.route.legs.flatMap((leg) =>
+    leg.steps.flatMap((step) =>
+      step.path.points.map(([longitude, latitude]) => ({
+        latitude,
+        longitude,
+      }))
+    )
+  );
+
+  if (path.length === 0) {
+    throw new Error('카카오 도보 경로 API 응답에 경로 좌표가 없습니다.');
+  }
+
+  return {
+    path,
+    distanceMeters: data.route.properties.totalDistance,
+    timeSeconds: data.route.properties.totalTime,
+  };
 }
 
 function buildStraightLineRoundTrip(
@@ -111,16 +169,16 @@ export async function generateRoundTripRoute(
   }
 
   try {
-    const outboundPath = await fetchKakaoWalkingPath(
+    const outboundLeg = await fetchKakaoWalkingLeg(
       start,
       targetPoint,
       kakaoRestApiKey
     );
-    const returnPath = [...outboundPath].reverse().slice(1);
+    const returnPath = [...outboundLeg.path].reverse().slice(1);
 
     return {
-      path: [...outboundPath, ...returnPath],
-      oneWayDistanceMeters,
+      path: [...outboundLeg.path, ...returnPath],
+      oneWayDistanceMeters: outboundLeg.distanceMeters,
       isFallback: false,
     };
   } catch (error) {
