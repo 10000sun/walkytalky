@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import AdBanner from '../ads/AdBanner';
 import {
   generateRoundTripRoute,
   type Coordinate,
@@ -104,6 +105,8 @@ export default function MapScreen({ minutes, onBack }: Props) {
           <Text style={styles.backButtonText}>다시 입력하기</Text>
         </Pressable>
       </View>
+
+      <AdBanner />
     </View>
   );
 }

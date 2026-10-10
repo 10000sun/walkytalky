@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import AdBanner from '../ads/AdBanner';
 
 interface Props {
   onSubmit: (minutes: number) => void;
@@ -24,28 +25,32 @@ export default function HomeScreen({ onSubmit }: Props) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>WalkyTalky</Text>
-      <Text style={styles.subtitle}>원하는 산책 시간을 입력하세요</Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>WalkyTalky</Text>
+        <Text style={styles.subtitle}>원하는 산책 시간을 입력하세요</Text>
 
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={minutesText}
-          onChangeText={setMinutesText}
-          keyboardType="number-pad"
-          maxLength={3}
-          placeholder="30"
-        />
-        <Text style={styles.unit}>분</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={minutesText}
+            onChangeText={setMinutesText}
+            keyboardType="number-pad"
+            maxLength={3}
+            placeholder="30"
+          />
+          <Text style={styles.unit}>분</Text>
+        </View>
+
+        <Pressable
+          style={[styles.button, !isValid && styles.buttonDisabled]}
+          onPress={() => isValid && onSubmit(minutes)}
+          disabled={!isValid}
+        >
+          <Text style={styles.buttonText}>왕복 산책로 찾기</Text>
+        </Pressable>
       </View>
 
-      <Pressable
-        style={[styles.button, !isValid && styles.buttonDisabled]}
-        onPress={() => isValid && onSubmit(minutes)}
-        disabled={!isValid}
-      >
-        <Text style={styles.buttonText}>왕복 산책로 찾기</Text>
-      </Pressable>
+      <AdBanner />
     </KeyboardAvoidingView>
   );
 }
@@ -54,6 +59,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
