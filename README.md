@@ -1,197 +1,97 @@
 # WalkyTalky
 
-원하는 산책 시간을 입력하면 현재 위치를 기준으로 왕복 산책 경로(같은 길로 갔다가 돌아오는 경로)를
-지도 위에 보여주는 앱입니다. React Native(Expo) + TypeScript로 만들었습니다.
+원하는 산책 시간(분)을 입력하면 현재 위치를 기준으로 왕복 산책 경로(같은 길로 갔다가 돌아오는 경로)를 지도 위에 보여주는 앱입니다. React Native(Expo) + TypeScript로 만들었고, 현재는 **Android 빌드를 기준**으로 합니다.
 
-- **지도 표시(마커, 경로선)**: 네이버 지도 SDK
-- **실제 도보 경로 계산**: 카카오맵 도보 길찾기 REST API
-- **광고**: 구글 애드몹(AdMob) 배너 광고
+## 기능
+- 산책 시간(분) 입력 (기본값 30분, 0보다 큰 숫자만 허용)
+- 평균 보행 속도 4.5km/h로 총 거리를 계산하고, 그 절반을 편도 거리로 삼아 **정북 방향**으로 떨어진 지점을 반환점으로 잡음
+- 카카오 도보 길찾기 REST API로 출발지 → 반환점의 실제 도보 경로를 받아, 같은 경로를 되돌아오는 왕복 경로를 만듦
+- 네이버 지도에 경로선, 출발/도착 마커, 반환점 마커 표시. 편도 거리(m) 표시
+- 화면 하단 AdMob 배너 광고 (입력 화면, 지도 화면)
 
-두 서비스를 조합해서 씁니다. 지도를 그리는 건 네이버 SDK가 더 성숙해서 쓰고, 실제 걸을 수 있는
-경로 계산은 카카오가 2026년 7월에 새로 공개한 도보 길찾기 API로 처리합니다.
+## 기술 스택
+- Expo ~57 / React Native 0.86 / React 19 / TypeScript(strict)
+- 지도: `@mj-studio/react-native-naver-map` (네이티브 모듈이라 Expo Go로는 실행 불가)
+- 경로: 카카오 도보 길찾기 REST API (`https://dapi.kakao.com/v2/routing/walk`)
+- 위치: `expo-location` (앱 사용 중 위치만)
+- 광고: `react-native-google-mobile-ads`
 
-## 지금 단계
-
-**Android Studio로 로컬 빌드 → 지인 테스트 → Play 스토어 정식 출시**를 목표로 합니다. iOS
-빌드/배포는 나중으로 미뤄둡니다 (맨 아래 "나중에 할 것" 참고).
-
-## 준비물
-
-- [Node.js](https://nodejs.org) (LTS 버전)
-- [Android Studio](https://developer.android.com/studio) — 설치하면 Android SDK, 에뮬레이터가
-  같이 깔립니다. 설치 후 SDK Manager에서 최신 Android SDK Platform 하나는 받아두세요.
-- 네이버 클라우드 플랫폼 Maps API Client ID
-- 카카오 Developers REST API 키
-
-## 1. API 키 발급
-
-### 네이버 지도 Client ID
-
-1. [Naver Cloud Platform](https://www.ncloud.com) 가입 및 로그인
-2. 콘솔 → AI·NAVER API → Application 등록 → "Maps" 선택
-3. Android 패키지명에 `com.walkytalky.app` 등록 (iOS는 나중에 할 때 등록해도 됨)
-4. 발급된 **Client ID** 복사
-
-### 카카오 REST API 키
-
-1. [Kakao Developers](https://developers.kakao.com) 가입 및 로그인
-2. 애플리케이션 추가 → [앱] → [제품 설정] → [카카오맵]에서 사용 설정 활성화
-3. [앱 키]에서 **REST API 키** 복사
-
-> **보안 주의**: 이 REST API 키는 앱 JS 코드에서 직접 호출하는 방식이라 클라이언트에
-> 노출됩니다. Kakao Developers 콘솔의 플랫폼 설정에서 Android 패키지명(`com.walkytalky.app`)으로
-> 키 사용을 제한해서 오남용을 막는 걸 권장해요. 더 안전하게 하려면 이 호출을 내 서버(또는
-> 서버리스 함수)를 거치게 만들어서 키를 서버에만 두는 방법도 있어요 (지금 버전엔 없음).
-
-### AdMob App ID / 광고 유닛 ID
-
-개발 중에는 발급받지 않아도 됩니다 (구글 공식 샘플 ID로 자동 대체돼서 테스트 광고가 떠요).
-**Play 스토어에 실제로 올리기 직전에만** 발급받으면 됩니다.
-
-1. [AdMob](https://admob.google.com) 가입 및 로그인 → 앱 추가 (아직 스토어에 없는 앱으로 등록)
-2. 추가하면 **App ID**(`ca-app-pub-xxxxxxxx~xxxxxxxx` 형식)가 발급됩니다
-3. 그 앱 안에 배너 광고 단위를 만들면 **광고 유닛 ID**(`ca-app-pub-xxxxxxxx/xxxxxxxx` 형식,
-   App ID와 헷갈리지 않게 구분)가 발급됩니다
-
-## 2. 프로젝트 설정
+## 필요한 키와 넣는 곳
+키는 소스에 넣지 않고 **`.env`** 에 둡니다. `.env`는 `.gitignore` 대상이라 커밋되지 않습니다.
 
 ```bash
 npm install
-cp .env.example .env
+cp .env.example .env   # 값을 채웁니다
 ```
 
-`.env` 파일에 키를 넣습니다. AdMob 쪽은 운영 출시 직전까지는 비워둬도 됩니다.
+| 변수 | 용도 | 읽는 곳 | 비워두면 |
+|---|---|---|---|
+| `NAVER_MAP_CLIENT_ID` | 네이버 클라우드 플랫폼 Maps Client ID | `app.config.ts` → 네이티브 설정(**prebuild 시점**에 반영) | 앱은 빌드·실행되지만 네이버 지도 인증이 되지 않아 지도가 정상 표시되지 않을 수 있음 (SDK 동작이라 코드로는 확인 불가) |
+| `EXPO_PUBLIC_KAKAO_REST_API_KEY` | 카카오 REST API 키 | `src/screens/MapScreen.tsx` (JS에서 직접 호출) | 도보 경로 API를 호출하지 않고 **직선 추정 경로**(출발지 → 정북 방향 반환점 → 출발지)로 대체하며, 화면에 "직선 거리로 추정한 경로" 안내가 표시됨. API 요청이 실패해도 같은 방식으로 대체됨 |
+| `ADMOB_ANDROID_APP_ID` | AdMob Android 앱 ID | `app.config.ts` → 네이티브 설정(prebuild 시점) | 구글 공식 샘플 앱 ID로 대체 |
+| `EXPO_PUBLIC_ADMOB_BANNER_AD_UNIT_ID` | 배너 광고 단위 ID | `src/ads/adUnitIds.ts` | 구글 테스트 배너 ID. 개발 빌드(`__DEV__`)에서는 값이 있어도 항상 테스트 ID를 사용 |
 
-```
-NAVER_MAP_CLIENT_ID=여기에_네이버_client_id
-EXPO_PUBLIC_KAKAO_REST_API_KEY=여기에_카카오_REST_API_키
-ADMOB_ANDROID_APP_ID=여기에_AdMob_App_ID (비워두면 구글 샘플 ID 사용)
-EXPO_PUBLIC_ADMOB_BANNER_AD_UNIT_ID=여기에_배너_광고_유닛_ID (비워두면 구글 테스트 ID 사용)
-```
+즉 **키가 하나도 없어도** 타입 검사·prebuild·빌드는 되고, 기능만 위 표처럼 줄어듭니다. 광고는 키가 없어도 테스트 광고로 동작합니다.
 
-## 3. Android Studio로 로컬 빌드 + 실행
+> **보안 주의**: `EXPO_PUBLIC_` 변수는 앱 번들에 그대로 포함되므로 카카오 REST API 키는 앱을 받은 사람이 꺼내 볼 수 있습니다. Kakao Developers 콘솔에서 Android 패키지명(`com.walkytalky.app`) 등으로 사용을 제한하는 것을 권장합니다. 키를 서버에만 두려면 호출을 서버(또는 서버리스 함수)로 옮겨야 하며, 현재 버전에는 없습니다. 네이버 Client ID와 AdMob ID도 앱에 포함되는 식별자입니다.
 
-네이버 지도 SDK가 네이티브 코드라서 일반 Expo Go 앱으로는 실행이 안 됩니다. 대신 로컬에서
-네이티브 프로젝트를 만들어서 직접 빌드합니다.
+### 키 발급
+- **네이버**: [Naver Cloud Platform](https://www.ncloud.com) 콘솔에서 Maps 애플리케이션을 등록하고 Android 패키지명 `com.walkytalky.app`을 등록 → Client ID
+- **카카오**: [Kakao Developers](https://developers.kakao.com)에서 앱을 만들고 카카오맵 사용 설정을 활성화 → [앱 키]의 REST API 키
+- **AdMob**: 출시 직전에만 필요. [AdMob](https://admob.google.com)에서 앱 ID(`ca-app-pub-...~...`)와 배너 광고 단위 ID(`ca-app-pub-.../...`) 발급
+
+## 실행 방법 (Android)
+준비물: Node.js(LTS), Android Studio(Android SDK, 에뮬레이터 또는 USB 연결 기기)
 
 ```bash
-npx expo prebuild --platform android
+npx expo prebuild --platform android   # android/ 폴더 생성 (.gitignore 대상)
+npx expo run:android                    # 빌드·설치·실행
 ```
+Android Studio에서 열려면 생성된 `android/` 폴더를 `Open` 하면 됩니다. `app.config.ts`나 `.env`의 `NAVER_MAP_CLIENT_ID`, `ADMOB_ANDROID_APP_ID`를 바꿨다면 `prebuild`를 다시 실행해야 반영됩니다.
 
-처음 한 번 실행하면 `android/` 폴더가 생성됩니다 (이 폴더는 자동 생성 결과물이라 git에는
-안 올라가요). 이후 두 가지 방법 중 편한 걸로 실행하면 됩니다.
+타입 검사: `npx tsc --noEmit`
 
-**방법 A — 커맨드로 바로 실행 (제일 간단)**
-
-에뮬레이터를 켜두거나 USB로 안드로이드 폰을 연결한 상태에서:
-
+### 지인 테스트용 APK
 ```bash
-npx expo run:android
+cd android && ./gradlew assembleRelease
+# 결과: android/app/build/outputs/apk/release/app-release.apk
 ```
-
-빌드 후 자동으로 기기에 설치되고 실행됩니다. 이후 코드를 수정하면 실시간으로 반영돼요.
-
-**방법 B — Android Studio에서 직접 열기**
-
-Android Studio 실행 → `Open` → 생성된 `android/` 폴더 선택 → 상단 재생(▶) 버튼으로 실행.
-디버깅이나 로그를 더 자세히 보고 싶을 때 이 방법이 편해요.
-
-> `app.config.ts`를 수정했다면(예: 권한, 아이콘 설정 변경) `npx expo prebuild --platform android`를
-> 다시 실행해서 `android/` 폴더에 반영해야 합니다.
-
-## 4. 지인 테스트용 APK 만들기
-
-개발 중엔 `npx expo run:android`로 충분하지만, 지인들에게 설치 파일만 보내서 테스트하게
-하려면 독립 실행되는 APK가 필요합니다 (내 컴퓨터가 켜져 있지 않아도 동작하는 버전).
-
-```bash
-cd android
-./gradlew assembleRelease
-```
-
-빌드가 끝나면 `android/app/build/outputs/apk/release/app-release.apk` 파일이 생깁니다. 이
-파일을 카카오톡/구글 드라이브 등으로 지인들에게 보내주면 됩니다. 받는 사람은 설치할 때
-"출처를 알 수 없는 앱" 설치를 허용해야 해요 (안드로이드가 스토어 밖 설치라 경고를 띄우는
-정상적인 절차입니다).
+받는 사람은 "출처를 알 수 없는 앱" 설치를 허용해야 합니다.
 
 ## 프로젝트 구조
-
 ```
-App.tsx                    화면 전환(입력 화면 ↔ 지도 화면), 앱 시작 시 광고 SDK 초기화
-src/screens/HomeScreen.tsx 산책 시간(분) 입력 화면
-src/screens/MapScreen.tsx  현재 위치 기반 왕복 경로 지도 화면 (네이버 지도로 렌더링)
-src/lib/walkingRoute.ts    왕복 경로 계산 로직 — 카카오 도보 길찾기 API 연동, 실패 시 직선 추정 폴백
-src/ads/adUnitIds.ts       광고 유닛 ID 결정 (개발 빌드는 항상 구글 테스트 ID)
-src/ads/AdBanner.tsx       배너 광고 컴포넌트 — 광고 관련 코드는 전부 이 디렉터리에 모여 있음
-app.config.ts              Expo 설정 + 네이버 지도 SDK / 위치 권한 / AdMob 설정
-```
-
-## Play 스토어 출시 체크리스트
-
-지인 테스트가 끝나고 정식 출시할 때 손봐야 할 것들을 정리했어요. 코드로 되는 부분은 이미
-반영해뒀고, 나머지는 Play Console 웹사이트에서 직접 해야 하는 작업이에요.
-
-### 코드/빌드 쪽 (이미 준비됨 또는 할 일)
-
-- [x] Android 패키지명 고정 (`com.walkytalky.app`) — 출시 후에는 **변경 불가**이니 지금 확정해두는 게 좋아요
-- [x] `android.versionCode` 설정 — **업로드할 때마다 1씩 올려야** 해요 (같은 값 재업로드는 거부됨). `app.config.ts`에서 수정
-- [ ] **APK가 아니라 AAB(Android App Bundle)로 빌드해야 함** — 신규 앱은 AAB만 허용돼요. 로컬에서는:
-  ```bash
-  cd android
-  ./gradlew bundleRelease
-  ```
-  결과물: `android/app/build/outputs/bundle/release/app-release.aab`
-- [ ] **릴리즈용 서명 키(keystore) 만들기** — 테스트용 APK는 디버그 키로 서명되는데, 스토어
-  업로드용은 release keystore가 따로 필요해요. (`keytool -genkeypair ...`로 생성하거나
-  Android Studio의 Build > Generate Signed App Bundle 기능 사용). **이 키스토어 파일과
-  비밀번호를 잃어버리면 같은 앱으로 업데이트를 올릴 수 없으니 꼭 안전하게 백업**해두세요.
-- [ ] 실제 앱 아이콘/스플래시 이미지로 교체 — 지금은 Expo 기본 템플릿 아이콘이 들어가 있어요
-  (`assets/` 폴더)
-- [ ] AdMob App ID / 광고 유닛 ID를 실제 값으로 `.env`에 채우기 (위 "AdMob" 항목 참고)
-
-### Play Console 쪽 (웹사이트에서 직접 해야 함)
-
-- [ ] [Play Console](https://play.google.com/console) 개발자 계정 등록 — **1회성 $25**
-- [ ] **개인정보처리방침(Privacy Policy) 페이지 준비하고 URL 등록** — 필수입니다. 위치 정보와
-  광고(AdMob이 광고 ID 등을 수집)를 쓰기 때문에 더더욱 빠뜨리면 바로 반려돼요. 간단한 정적
-  페이지 하나면 충분해요 (예: GitHub Pages, Notion 공개 페이지 등). 내용 작성은 제가 도와드릴
-  수 있어요 (법률 자문은 아니지만 표준 양식에 맞춰 초안을 써드릴 수 있어요).
-- [ ] **데이터 보안(Data safety) 설문 작성** — 앱 콘텐츠 메뉴에서, "위치 정보 수집(앱 기능
-  제공 목적)"과 "광고 ID 수집(AdMob)"을 정확히 표시해야 해요
-- [ ] **콘텐츠 등급 설문** 작성
-- [ ] **비공개 테스트(Closed testing) 선행 필수** — 최근 정책상 신규 개인 개발자 계정은
-  프로덕션 출시 전에 테스터 12명을 모아 14일 연속 비공개 테스트를 거쳐야 해요. 앞서 만든
-  지인 테스트용 APK/AAB를 이 단계에 그대로 활용하면 돼요
-- [ ] 스토어 등록 정보: 앱 이름, 설명, 스크린샷(최소 2장), 아이콘, 카테고리 등 작성
-- [ ] 타깃 API 레벨 확인 — 2026년 8월 31일부터 신규 앱은 **Android 16(API 36) 이상**을
-  타깃해야 해요. `npx expo prebuild`로 생성된 `android/app/build.gradle`의
-  `targetSdkVersion` 값을 확인해서, 쓰고 있는 Expo SDK 버전이 이 기준을 만족하는지
-  체크하세요 (보통 최신 Expo SDK는 자동으로 맞춰줘요)
-- [ ] 개발자 본인 인증(Developer verification) — 2026년 9월 30일부터 일부 국가에서 시작된
-  새 요건이라 계정 등록 과정에서 요구할 수 있어요
-
-위 Play Console 항목들은 웹 UI에서 진행하셔야 해서 제가 대신 해드릴 순 없지만, 개인정보처리방침
-초안 작성이나 데이터 보안 설문에 뭐라고 답해야 할지 같은 건 같이 준비해드릴 수 있어요.
-
-참고: [앱 출시 준비 - Android Developers](https://developer.android.com/studio/publish/preparing)
-
-## 나중에 할 것 (지금은 보류)
-
-### iOS 빌드
-
-Mac 없이도 가능하지만 Apple Developer Program(연 $99) 가입이 필요해요. 그때 가서 EAS 클라우드
-빌드로 진행하면 됩니다.
-
-```bash
-npm install -g eas-cli
-eas login
-eas build:configure
-eas build --platform ios --profile development
+App.tsx                    입력 화면 ↔ 지도 화면 전환, 광고 SDK 초기화
+src/screens/HomeScreen.tsx 산책 시간(분) 입력
+src/screens/MapScreen.tsx  위치 권한 요청, 현재 위치, 경로 생성, 네이버 지도 렌더링
+src/lib/walkingRoute.ts    거리 계산, 카카오 도보 경로 호출, 실패/키 없음 시 직선 추정 경로
+src/ads/adUnitIds.ts       광고 단위 ID 결정 (개발 빌드는 항상 테스트 ID)
+src/ads/AdBanner.tsx       배너 광고 컴포넌트
+app.config.ts              Expo 설정 + 네이버 지도 / 위치 권한 / AdMob 플러그인 설정
+.env.example               환경변수 템플릿
 ```
 
-빌드가 끝나면 QR코드/링크로 아이폰에 바로 설치할 수 있어요 (Mac 불필요, 클라우드에서 빌드됨).
+## 권한 / 개인정보
+- **위치 (앞에 있을 때만)**: 현재 위치를 기준으로 경로를 계산하기 위해 사용합니다. Android는 `ACCESS_FINE_LOCATION`을 선언합니다. 거부하면 "위치 권한이 필요해요" 안내가 표시되고 경로를 만들 수 없습니다.
+- **외부 전송**: 키가 설정돼 있으면 출발지와 반환점 좌표가 카카오 도보 길찾기 API로 전송됩니다. 지도는 네이버 지도 SDK가, 광고는 AdMob이 각자 처리합니다(광고는 비맞춤 광고만 요청: `requestNonPersonalizedAdsOnly`).
+- 개발자 서버는 없고, 앱이 위치를 저장하는 코드는 없습니다.
 
-### App Store 정식 출시
+## 상태 / 한계
+- 초기 개발 단계의 앱이며 Play 스토어에는 출시되지 않았습니다.
+- 반환점은 항상 **정북 방향**(bearing 0)으로 잡으므로 북쪽이 강·바다·도로 밖이면 가까운 도보 경로가 부정확하거나 실패(직선 추정으로 대체)할 수 있습니다. 순환 경로나 방향 선택은 없습니다.
+- 카카오 도보 경로 API 요청이 실패하면 안내 문구와 함께 직선 추정 경로로 대체됩니다.
+- 경로 계산 실패 시의 재시도, 지도 SDK 오류 화면, 자동화 테스트는 없습니다.
+- iOS: `app.config.ts`에 `bundleIdentifier`는 있으나 AdMob iOS 앱 ID가 설정돼 있지 않아(`expo config` 경고) iOS 빌드는 아직 지원하지 않습니다.
 
-Apple Developer Program 가입 상태에서 App Store Connect에 앱 등록 + 심사 제출이 필요해요.
-iOS 빌드를 진행할 때 다시 자세히 안내해드릴게요.
+## Play 스토어 출시 전 체크리스트
+정책은 바뀔 수 있으니 Play Console 안내를 함께 확인하세요.
+- [ ] `android.versionCode`(`app.config.ts`)를 업로드마다 증가, 패키지명 `com.walkytalky.app`은 출시 후 변경 불가
+- [ ] AAB 빌드: `cd android && ./gradlew bundleRelease` (`android/app/build/outputs/bundle/release/app-release.aab`)
+- [ ] 릴리스 서명 키스토어 생성·백업 (`*.jks`는 `.gitignore` 대상. 커밋 금지)
+- [ ] `assets/`의 아이콘·스플래시를 실제 이미지로 교체
+- [ ] AdMob 실제 앱 ID / 배너 ID를 `.env`에 입력 (테스트 ID로 출시 금지)
+- [ ] 개인정보처리방침 URL 준비 (위치, 광고 ID 사용 명시), 데이터 보안 양식, 콘텐츠 등급
+- [ ] 스토어 등록 정보(설명, 스크린샷, 아이콘), 필요한 경우 비공개 테스트
+- [ ] 카카오 REST API 키 사용 제한 설정
+
+## 라이선스
+저장소의 `LICENSE`는 MIT 라이선스 전문이며 저작권 표기가 Expo 템플릿(650 Industries)으로 되어 있습니다. 본인 저작권 표기로 바꿀지 확인하세요.
